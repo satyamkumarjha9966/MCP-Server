@@ -1,0 +1,17 @@
+{
+	"servers": {
+		"learn-mcp": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["/Users/pw/Downloads/learn-mcp/build/server.js"],
+			"cwd": "/Users/pw/Downloads/learn-mcp",
+			"dev": {
+				"watch": "build/**/*.js",
+				"debug": {
+					"type": "node"
+				}
+			}
+		}
+	},
+	"inputs": []
+}
