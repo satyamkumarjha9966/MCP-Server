@@ -1,8 +1,13 @@
-import { input, select } from "@inquirer/prompts"
+import "dotenv/config"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { confirm, input, select } from "@inquirer/prompts"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
-import { Tool } from "@modelcontextprotocol/sdk/types.js"
+import { CreateMessageRequestSchema, PromptMessage, Tool } from "@modelcontextprotocol/sdk/types.js"
+import { generateText, jsonSchema, ToolSet } from "ai"
 import { promise } from "zod/v4"
+
+
 
 const mcp = new Client(
     {
@@ -18,6 +23,10 @@ const transport = new StdioClientTransport({
     stderr: "ignore",
 })
 
+const google = createGoogleGenerativeAI({
+    apiKey: process.env.GOOGLE_API_KEY || "",
+})
+
 async function main() {
     await mcp.connect(transport)
     const [tools, { prompts }, { resources }, { resourceTemplates }] = await Promise.all([
@@ -26,6 +35,25 @@ async function main() {
         mcp.listResources(),
         mcp.listResourceTemplates()
     ])
+
+    mcp.setRequestHandler(CreateMessageRequestSchema, async request => {
+        const texts: string[] = []
+        for (const message of request.params.messages) {
+            // @ts-ignore
+            const text = await handleServerMessagePrompts(message)
+            if (text != null) texts.push(text)
+        }
+
+        return {
+            role: "user",
+            model: "gemini-2.0-flash",
+            stopReason: "endTurn",
+            content: {
+                type: "text",
+                text: texts.join("\n"),
+            }
+        }
+    })
 
     console.log("You Are Connected Succcessfully");
 
@@ -75,6 +103,24 @@ async function main() {
                 } else {
                     await handleResource(uri);
                 }
+            case "Prompts":
+                const promptName = await select({
+                    message: "Select a prompt",
+                    choices: prompts?.map((p: any) => ({
+                        name: p.annotations?.title || p.name,
+                        value: p.name,
+                        description: p.description,
+                    })),
+                })
+                const prompt = prompts.find((p: any) => p.name === promptName)
+                if (!prompt) {
+                    console.log("Prompt not found")
+                    continue
+                } else {
+                    await handlePrompt(prompt);
+                }
+            case "Query":
+                await handleQuery(tools.tools);
         }
     }
 
@@ -115,6 +161,75 @@ async function handleResource(uri: string) {
     })
 
     console.log("Resource content:", res)
+}
+
+async function handlePrompt(prompt: any) {
+    const args: Record<string, string> = {}
+    for (const arg of prompt.arguments ?? []) {
+        args[arg.name] = await input({
+            message: `Enter value for ${arg.name}`
+        })
+    }
+
+    const result = await mcp.getPrompt({
+        name: prompt.name,
+        arguments: args,
+    })
+
+    for await (const message of result.messages) {
+        console.log(await handleServerMessagePrompts(message));
+
+    }
+}
+
+async function handleServerMessagePrompts(message: PromptMessage) {
+    if (message.content.type !== "text") return
+
+    console.log("Message from prompt:", message.content.text)
+
+    const run = await confirm({
+        message: "Do you want to run this prompt?",
+        default: true,
+    })
+
+    if (!run) return;
+
+    const { text } = await generateText({
+        model: google("gemini-1.5-flash"),
+        prompt: message.content.text,
+    })
+
+    return text;
+}
+
+async function handleQuery(tools: Tool[]) {
+    const query = await input({ message: "Enter your query" })
+
+    const toolSet: ToolSet = tools?.reduce((obj, tool) => ({
+        ...obj,
+        [tool.name]: {
+            description: tool.description,
+            inputSchema: jsonSchema(tool.inputSchema), // ✅ must be `inputSchema`, not `parameters`
+            execute: async (args: Record<string, any>) => {
+                return await mcp.callTool({
+                    name: tool.name,
+                    arguments: args
+                })
+            }
+        }
+    }), {} as ToolSet);
+
+    const { text, toolResults } = await generateText({
+        model: google("gemini-2.0-flash"),
+        prompt: query,
+        tools: toolSet
+    })
+
+    console.log("Response:", text)
+
+    if (toolResults) {
+        console.log("Tool Results:", toolResults)
+    }
 }
 
 main().catch((error) => {
