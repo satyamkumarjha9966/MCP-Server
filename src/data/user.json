@@ -28,5 +28,17 @@
     "name": "test",
     "email": "test@gmail.com",
     "password": "jwgfhwetyd"
+  },
+  {
+    "id": 6,
+    "name": "satshi",
+    "email": "satshi@example.com",
+    "password": "S@tshi2026!x9"
+  },
+  {
+    "id": 7,
+    "name": "sund",
+    "email": "sund@gmail.com",
+    "password": "skhfhjgd"
   }
 ]

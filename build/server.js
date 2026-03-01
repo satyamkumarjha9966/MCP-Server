@@ -133,6 +133,74 @@ server.registerPrompt("generate-fake-user", {
         ],
     };
 });
+const SamplingResponseSchema = z.any();
+// Sampling Example - Basically use for all the AI to get some response 
+server.registerTool('create-random-user', {
+    description: 'Create a random user using fake data from the sampling API',
+    annotations: {
+        title: "Create User",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+    },
+}, async () => {
+    // 1) Ask the model to generate a JSON-only user profile.
+    let response;
+    try {
+        response = await server.server.request({
+            method: "sampling/createMessage",
+            params: {
+                model: "gpt-4o", // REQUIRED
+                messages: [
+                    {
+                        role: "user",
+                        content: {
+                            type: "text",
+                            text: "Generate a fake user profile with the name 'John Doe'. The profile should include name, email, and password. Return only the profile in JSON format.",
+                        },
+                    },
+                ],
+                maxTokens: 1024,
+            },
+        }, SamplingResponseSchema);
+    }
+    catch (err) {
+        return { content: [{ type: "text", text: `Model call failed: ${String(err)}` }] };
+    }
+    // 2) Validate we got text back from the model.
+    const modelText = response.content[0]?.text;
+    if (typeof modelText !== "string") {
+        return { content: [{ type: "text", text: `${'Failed to generate fake user profile (no text returned)' + modelText + JSON.stringify(response)}` }] };
+    }
+    // 3) Clean common code fences and surrounding markdown. Models sometimes wrap
+    //    JSON in triple-backtick fences (```json ... ```). Remove them before parsing.
+    const cleaned = modelText
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/, "")
+        .trim();
+    // 4) Parse JSON and validate required fields. Return helpful errors if parsing
+    //    or validation fails so callers know what went wrong.
+    let fakeUser;
+    try {
+        fakeUser = JSON.parse(cleaned);
+    }
+    catch (err) {
+        return { content: [{ type: "text", text: `Failed to parse model output as JSON: ${String(err)}` }] };
+    }
+    if (!fakeUser || typeof fakeUser.name !== "string" || typeof fakeUser.email !== "string" || typeof fakeUser.password !== "string") {
+        return { content: [{ type: "text", text: "Model output is missing required fields: name, email, password" }] };
+    }
+    // 5) Persist the user and return success or a persistence error.
+    try {
+        const id = await createUser(fakeUser);
+        return { content: [{ type: "text", text: `User ${id} created successfully` }] };
+    }
+    catch (err) {
+        return { content: [{ type: "text", text: `Failed to create user: ${String(err)}` }] };
+    }
+});
 async function createUser(user) {
     const raw = await fs.readFile(userDataPath, "utf-8");
     const users = JSON.parse(raw);

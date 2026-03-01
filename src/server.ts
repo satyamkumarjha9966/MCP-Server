@@ -1,4 +1,4 @@
-import {McpServer, ResourceTemplate} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import fs from "node:fs/promises";
@@ -44,14 +44,14 @@ server.registerTool(
     },
   },
   async (args) => {
-      try {
-            const id = await createUser(args);
-            return {content: [{ type: "text", text: `Created user: ${id}` }]}
-      } catch (error) {
-            return {content: [{ type: "text", text: `Failed to create user: ${error}` }]}
-      }
-    
-}
+    try {
+      const id = await createUser(args);
+      return { content: [{ type: "text", text: `Created user: ${id}` }] }
+    } catch (error) {
+      return { content: [{ type: "text", text: `Failed to create user: ${error}` }] }
+    }
+
+  }
 );
 
 // registerResource: use ResourceTemplate with list() so the resource appears in templates list (some clients only show templates).
@@ -162,29 +162,103 @@ server.registerPrompt(
 )
 
 
+const SamplingResponseSchema = z.any();
+
+// Sampling Example - Basically use for all the AI to get some response 
+server.registerTool('create-random-user', {
+  description: 'Create a random user using fake data from the sampling API',
+  annotations: {
+    title: "Create User",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+}, async () => {
+  // 1) Ask the model to generate a JSON-only user profile.
+  let response: any;
+  try {
+    response = await server.server.request(
+      {
+        method: "sampling/createMessage",
+        params: {
+          model: "gpt-4o", // REQUIRED
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: "Generate a fake user profile with the name 'John Doe'. The profile should include name, email, and password. Return only the profile in JSON format.",
+              },
+            },
+          ],
+          maxTokens: 1024,
+        },
+      },
+      SamplingResponseSchema
+    );
+  } catch (err) {
+    return { content: [{ type: "text", text: `Model call failed: ${String(err)}` }] };
+  }
+
+  // 2) Validate we got text back from the model.
+  const modelText = response.content[0]?.text;
+  if (typeof modelText !== "string") {
+    return { content: [{ type: "text", text: `${'Failed to generate fake user profile (no text returned)' + modelText + JSON.stringify(response)}` }] };
+  }
+
+  // 3) Clean common code fences and surrounding markdown. Models sometimes wrap
+  //    JSON in triple-backtick fences (```json ... ```). Remove them before parsing.
+  const cleaned = modelText
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+
+  // 4) Parse JSON and validate required fields. Return helpful errors if parsing
+  //    or validation fails so callers know what went wrong.
+  let fakeUser: any;
+  try {
+    fakeUser = JSON.parse(cleaned);
+  } catch (err) {
+    return { content: [{ type: "text", text: `Failed to parse model output as JSON: ${String(err)}` }] };
+  }
+
+  if (!fakeUser || typeof fakeUser.name !== "string" || typeof fakeUser.email !== "string" || typeof fakeUser.password !== "string") {
+    return { content: [{ type: "text", text: "Model output is missing required fields: name, email, password" }] };
+  }
+
+  // 5) Persist the user and return success or a persistence error.
+  try {
+    const id = await createUser(fakeUser);
+    return { content: [{ type: "text", text: `User ${id} created successfully` }] };
+  } catch (err) {
+    return { content: [{ type: "text", text: `Failed to create user: ${String(err)}` }] };
+  }
+});
 
 async function createUser(user: {
-      name: string,
-      email: string,
-      password: string,
+  name: string,
+  email: string,
+  password: string,
 }) {
-      const raw = await fs.readFile(userDataPath, "utf-8");
-      const users = JSON.parse(raw) as Array<{ id: number; name: string; email: string; password: string }>;
-      const id = users.length + 1;
-      users.push({
-            id,
-            name: user.name,
-            email: user.email,
-            password: user.password,
-      });
-      await fs.writeFile(userDataPath, JSON.stringify(users, null, 2));
-      return id;
+  const raw = await fs.readFile(userDataPath, "utf-8");
+  const users = JSON.parse(raw) as Array<{ id: number; name: string; email: string; password: string }>;
+  const id = users.length + 1;
+  users.push({
+    id,
+    name: user.name,
+    email: user.email,
+    password: user.password,
+  });
+  await fs.writeFile(userDataPath, JSON.stringify(users, null, 2));
+  return id;
 }
 
 async function main() {
-      const transport = new StdioServerTransport();
-      await server.connect(transport);
-      console.log("Server is running on port 3000");
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.log("Server is running on port 3000");
 }
 
 main();
