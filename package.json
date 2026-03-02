@@ -1,6 +1,6 @@
 {
   "name": "@satyam1990/learn-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "src/server.ts",
   "type": "module",
   "bin": {
@@ -14,8 +14,17 @@
     "client:dev": "tsx src/client.ts",
     "prepublishOnly": "npm run serve:build"
   },
-  "keywords": ["mcp", "server", "learn", "mcp-server", "mcp-client"],
-  "files": ["build", "README.md"],
+  "keywords": [
+    "mcp",
+    "server",
+    "learn",
+    "mcp-server",
+    "mcp-client"
+  ],
+  "files": [
+    "build",
+    "README.md"
+  ],
   "author": "Satyam",
   "license": "MIT",
   "description": "A simple MCP server that learns from the user with Google AI SDK",
