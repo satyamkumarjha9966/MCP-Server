@@ -255,10 +255,10 @@ async function createUser(user: {
   return id;
 }
 
-async function main() {
+export async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log("Server is running on port 3000");
+  console.error("Server is running on port 3000");
 }
 
 main();

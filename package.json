@@ -1,19 +1,24 @@
 {
-  "name": "learn-mcp",
+  "name": "@satyam1990/learn-mcp",
   "version": "1.0.0",
   "main": "src/server.ts",
   "type": "module",
+  "bin": {
+    "my-mcp-server": "bin/cli.js"
+  },
   "scripts": {
     "serve:build": "tsc",
     "server:build:watch": "tsc --watch",
     "server:dev": "tsx src/server.ts",
     "server:inspect": "set DANGEROUSLY_OMIT_AUTH=true && npx @modelcontextprotocol/inspector npm run server:dev",
-    "client:dev": "tsx src/client.ts"
+    "client:dev": "tsx src/client.ts",
+    "prepublishOnly": "npm run serve:build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": ["mcp", "server", "learn"],
+  "files": ["build", "README.md"],
+  "author": "Satyam",
+  "license": "MIT",
+  "description": "A simple MCP server that learns from the user",
   "dependencies": {
     "@ai-sdk/google": "^3.0.34",
     "@inquirer/prompts": "^8.3.0",

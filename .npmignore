@@ -1,0 +1,11 @@
+# Source (npm only ships dist/)
+src/
+tsconfig.json
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env*
