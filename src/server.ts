@@ -258,7 +258,4 @@ async function createUser(user: {
 export async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Server is running on port 3000");
 }
-
-main();
