@@ -14,11 +14,11 @@
     "client:dev": "tsx src/client.ts",
     "prepublishOnly": "npm run serve:build"
   },
-  "keywords": ["mcp", "server", "learn"],
+  "keywords": ["mcp", "server", "learn", "mcp-server", "mcp-client"],
   "files": ["build", "README.md"],
   "author": "Satyam",
   "license": "MIT",
-  "description": "A simple MCP server that learns from the user",
+  "description": "A simple MCP server that learns from the user with Google AI SDK",
   "dependencies": {
     "@ai-sdk/google": "^3.0.34",
     "@inquirer/prompts": "^8.3.0",
